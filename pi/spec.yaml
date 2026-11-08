@@ -46,4 +46,5 @@ capabilities:
           - registry.npmjs.org:443
           - github.com:443
           - api.github.com:443
+          - ssh.github.com:443
 
