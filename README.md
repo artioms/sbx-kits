@@ -46,7 +46,7 @@ sbx run ./pi --name sbx-pi .
 
 ### Run directly from GitHub
 
-Docker Sandbox can fetch a kit from a Git repository. Replace `<OWNER>/<REPOSITORY>` with this repository's GitHub location and `<COMMIT>` with a commit SHA (recommended) or tag. `dir` selects the kit directory in the repository:
+Docker Sandbox can fetch kits from a Git repository. In this template, replace `<OWNER>/<REPOSITORY>` with the repository location and `<COMMIT>` with a commit SHA (recommended) or tag. `dir` selects a kit directory within the repository:
 
 ```bash
 sbx run \
@@ -56,7 +56,17 @@ sbx run \
   /Users/user/Dev/project
 ```
 
-This runs the Pi workload with the Node.js 24 mixin from the same GitHub revision. Use a commit SHA to make both kit sources reproducible. Git-based kit sources may be restricted by Docker Sandbox configuration; allow Git sources if your installation blocks them by default. See Docker's [kit source documentation](https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-a-kit-source).
+For this repository, here is a ready-to-run example that uses the latest commit on `main` and mounts your current directory:
+
+```bash
+sbx run \
+  "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=pi" \
+  --name sbx-pi-node24 \
+  --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=node24" \
+  .
+```
+
+`dir` selects each kit directory. The example uses `main`; for reproducible builds, replace `main` in both URLs with the same commit SHA. Git-based kit sources may be restricted by Docker Sandbox configuration; allow Git sources if your installation blocks them by default. See Docker's [kit source documentation](https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-a-kit-source).
 
 ## Security
 
