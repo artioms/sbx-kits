@@ -1,0 +1,49 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: workload
+
+displayName: Pi Coding Agent
+description: Pi with Docker-managed ChatGPT OAuth
+version: "1.0.0"
+
+provides:
+  - pi
+
+capabilities:
+  - type: com.docker.sandbox/sbx@1
+
+  # Host-managed OpenAI OAuth.
+  # Uses the same credential and proxy sentinel as
+  # Docker's official Codex sandbox.
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: OpenAI SIWC OAuth for Pi
+    config:
+      service: openai
+      phase: runtime
+      apiKey:
+        name: OPENAI_API_KEY
+        proxyManaged: true
+        inject:
+          - domain: api.openai.com
+            header: Authorization
+            format: "Bearer %s"
+
+  # Pi agent skills.
+  - type: com.docker.sandbox/agent-skills@1
+    config:
+      path: /home/agent/.agents/skills
+
+  # Runtime network access.
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      runtime:
+        allow:
+          - pi.dev:443
+          - chatgpt.com:443
+          - auth.openai.com:443
+          - api.openai.com:443
+          - registry.npmjs.org:443
+          - github.com:443
+          - api.github.com:443
+

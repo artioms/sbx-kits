@@ -1,0 +1,9 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+displayName: Node.js 24
+description: Node.js 24 LTS runtime with npm and npx
+version: "1.0.0"
+
+provides:
+  - node@24.22.2
