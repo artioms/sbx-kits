@@ -1,4 +1,4 @@
-FROM docker/sandbox-templates:shell
+FROM docker.io/sbx/shell-docker-image:latest
 
 USER root
 
