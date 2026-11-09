@@ -11,7 +11,6 @@ provides:
 
 capabilities:
   - type: com.docker.sandbox/sbx@1
-  - type: com.docker.sandbox/dockerd@1
 
   # Host-managed OpenAI OAuth.
   # Uses the same credential and proxy sentinel as
