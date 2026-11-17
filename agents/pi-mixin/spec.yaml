@@ -1,0 +1,198 @@
+
+schemaVersion: "3"
+kind: mixin
+
+displayName: Pi Coding Agent
+author: Artiom Sargesjan
+description: Pi coding agent CLI for Docker Sandbox shell workloads.
+
+sourceUrl: https://github.com/artioms/sbx-kits/agents/pi
+version: "1.0.0"
+
+licenses:
+  - MIT
+
+provides:
+  - pi@1.5.2
+
+args:
+  version:
+    default: "1.5.2"
+    description: Pi coding agent release to install
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+    buildArg: VERSION
+
+  model:
+    default: "openai/gpt-6-luna"
+    description: Default model as provider/model
+    pattern: '^[A-Za-z0-9._/:-]*$'
+    env: PI_KIT_MODEL
+
+  thinkingLevel:
+    default: "medium"
+    description: Default Pi thinking level
+    enum:
+      - ""
+      - off
+      - minimal
+      - low
+      - medium
+      - high
+      - xhigh
+      - max
+    env: PI_KIT_THINKING_LEVEL
+
+capabilities:
+
+  # Network policy
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      runtime:
+        allow:
+          - api.anthropic.com:443
+          - platform.claude.com:443
+          - pi.dev:443
+          - chatgpt.com:443
+          - auth.openai.com:443
+          - api.openai.com:443
+          - registry.npmjs.org:443
+          - github.com:443
+          - api.github.com:443
+          - ssh.github.com:443
+
+  # OpenAI credentials
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: OpenAI credentials for Pi
+    config:
+      service: openai
+      phase: runtime
+      apiKey:
+        name: OPENAI_API_KEY
+        proxyManaged: true
+        inject:
+          - domain: api.openai.com
+            header: Authorization
+            format: "Bearer %s"
+
+  # Lifecycle configuration
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+
+        # Prepare Pi directories
+        - command: |
+            set -eu
+            mkdir -p /home/agent/.pi/agent
+            mkdir -p /home/agent/.agents
+            chown -R agent:agent /home/agent/.pi /home/agent/.agents
+          description: Prepare Pi configuration directories
+          user: "0"
+
+        # Generate Pi settings
+        - command: |
+            set -eu
+
+            model="${PI_KIT_MODEL:-}"
+            thinking="${PI_KIT_THINKING_LEVEL:-}"
+
+            MODEL=""
+            THINKING=""
+
+            if [ -n "$model" ]; then
+              provider=anthropic
+              case "$model" in
+                */*)
+                  provider="${model%%/*}"
+                  model="${model#*/}"
+                  ;;
+              esac
+
+              MODEL="  \"defaultProvider\": \"$provider\",
+              \"defaultModel\": \"$model\","
+            fi
+
+            if [ -n "$thinking" ]; then
+              THINKING="  \"defaultThinkingLevel\": \"$thinking\","
+            fi
+
+            printf '{
+              "$schema": "https://pi.dev/schemas/settings.schema.json",
+            %s
+            %s
+              "defaultProjectTrust": "always"
+            }\n' "$MODEL" "$THINKING" \
+              > /home/agent/.pi/agent/settings.json
+          description: Configure Pi default settings
+          env:
+            - PI_KIT_MODEL
+            - PI_KIT_THINKING_LEVEL
+          user: agent
+
+        # Register Docker Sandbox MCP gateway
+        - command: |
+            set -eu
+
+            if [ -n "${MCP_GATEWAY_URL:-}" ]; then
+              pi mcp add mcp-gateway \
+                --url "$MCP_GATEWAY_URL" \
+                --header "Authorization=Bearer $MCP_SENTINEL_TOKEN_NAME"
+            fi
+          description: Register Docker Sandbox MCP gateway
+          env:
+            - MCP_GATEWAY_URL
+            - MCP_SENTINEL_TOKEN_NAME
+          user: agent
+
+  # Shared agent skills
+  - type: com.docker.sandbox/agent-skills@1
+    optional: true
+    config:
+      path: /home/agent/.agents/skills
+
+  # Pi agent instructions
+  - type: com.docker.sandbox/agent-context@2
+    optional: true
+    config:
+      directory: /home/agent/.pi/agent
+      filename: AGENTS.md
+      content: |
+        # Pi Coding Agent
+
+        Pi is installed at /usr/local/bin/pi.
+
+        ## Usage
+
+        Interactive:
+          pi
+
+        One-shot:
+          pi -p "Your task"
+
+        Continue latest session:
+          pi --continue
+
+        Resume session:
+          pi --resume
+
+        ## Configuration
+
+        Configuration directory:
+          ~/.pi/agent
+
+        Shared skills:
+          ~/.agents/skills
+
+        ## Authentication
+
+        Authentication is managed by Docker Sandbox.
+
+        OPENAI_API_KEY and ANTHROPIC_API_KEY are
+        proxy-managed credentials, not real API keys.
+
+        Do not run pi auth login or overwrite
+        Docker-managed authentication files.
+
+        ## Security
+
+        Do not print or expose credential sentinels.
