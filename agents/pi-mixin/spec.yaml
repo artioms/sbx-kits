@@ -75,73 +75,39 @@ capabilities:
             header: Authorization
             format: "Bearer %s"
 
-  # Lifecycle configuration
   - type: com.docker.sandbox/lifecycle@1
     config:
       install:
-
-        # Prepare Pi directories
         - command: |
             set -eu
             mkdir -p /home/agent/.pi/agent
+            chown -R agent:agent /home/agent/.pi
             mkdir -p /home/agent/.agents
-            chown -R agent:agent /home/agent/.pi /home/agent/.agents
+            chown agent:agent /home/agent/.agents
           description: Prepare Pi configuration directories
           user: "0"
 
-        # Generate Pi settings
         - command: |
             set -eu
 
-            model="${PI_KIT_MODEL:-}"
-            thinking="${PI_KIT_THINKING_LEVEL:-}"
+            model="${PI_KIT_MODEL:-openai/gpt-6-luna}"
+            thinking="${PI_KIT_THINKING_LEVEL:-medium}"
 
-            MODEL=""
-            THINKING=""
-
-            if [ -n "$model" ]; then
-              provider=anthropic
-              case "$model" in
-                */*)
-                  provider="${model%%/*}"
-                  model="${model#*/}"
-                  ;;
-              esac
-
-              MODEL="  \"defaultProvider\": \"$provider\",
-              \"defaultModel\": \"$model\","
-            fi
-
-            if [ -n "$thinking" ]; then
-              THINKING="  \"defaultThinkingLevel\": \"$thinking\","
-            fi
+            provider="${model%%/*}"
+            model="${model#*/}"
 
             printf '{
               "$schema": "https://pi.dev/schemas/settings.schema.json",
-            %s
-            %s
+              "defaultProvider": "%s",
+              "defaultModel": "%s",
+              "defaultThinkingLevel": "%s",
               "defaultProjectTrust": "always"
-            }\n' "$MODEL" "$THINKING" \
+            }\n' "$provider" "$model" "$thinking" \
               > /home/agent/.pi/agent/settings.json
           description: Configure Pi default settings
           env:
             - PI_KIT_MODEL
             - PI_KIT_THINKING_LEVEL
-          user: agent
-
-        # Register Docker Sandbox MCP gateway
-        - command: |
-            set -eu
-
-            if [ -n "${MCP_GATEWAY_URL:-}" ]; then
-              pi mcp add mcp-gateway \
-                --url "$MCP_GATEWAY_URL" \
-                --header "Authorization=Bearer $MCP_SENTINEL_TOKEN_NAME"
-            fi
-          description: Register Docker Sandbox MCP gateway
-          env:
-            - MCP_GATEWAY_URL
-            - MCP_SENTINEL_TOKEN_NAME
           user: agent
 
   # Shared agent skills
