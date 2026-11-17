@@ -1,0 +1,180 @@
+schemaVersion: "3"
+displayName: Pi (mixin)
+author: Artiom Sargesjan
+description: Pi coding agent overlay for a shell workload, with Node.js, fd, and Docker-managed OpenAI and Anthropic credentials.
+sourceUrl: https://github.com/docker-hardened-images/definitions
+version: 1.5.2
+licenses:
+    - MIT
+kind: mixin
+provides:
+    - pi@1.5.2
+capabilities:
+    - type: com.docker.sandbox/network-policy@1
+      config:
+        runtime:
+            allow:
+                - api.anthropic.com:443
+                - platform.claude.com:443
+                - pi.dev:443
+                - chatgpt.com:443
+                - auth.openai.com:443
+                - api.openai.com:443
+                - registry.npmjs.org:443
+                - github.com:443
+                - api.github.com:443
+                - ssh.github.com:443
+    - type: com.docker.sandbox/credential@1
+      optional: true
+      description: OpenAI SIWC OAuth for Pi
+      config:
+        service: openai
+        phase: runtime
+        apiKey:
+            name: OPENAI_API_KEY
+            proxyManaged: true
+            inject:
+                - domain: api.openai.com
+                  header: Authorization
+                  format: 'Bearer %s'
+    - type: com.docker.sandbox/credential@1
+      name: Anthropic access
+      optional: true
+      config:
+        apiKey:
+            inject:
+                - domain: api.anthropic.com
+                  format: '%s'
+                  header: x-api-key
+            name: ANTHROPIC_API_KEY
+            proxyManaged: true
+        oauth:
+            credentialFile:
+                path: ~/.pi/agent/auth.json
+                structure:
+                    anthropic:
+                        access: '{{.AccessToken}}'
+                        expires: '{{.ExpiresAt}}'
+                        refresh: '{{.RefreshToken}}'
+                        type: oauth
+            resourceHosts:
+                - api.anthropic.com
+            sentinels:
+                accessToken: sk-ant-oat01-proxy-managed
+                refreshToken: sk-ant-ort01-proxy-managed
+            tokenEndpoint:
+                host: platform.claude.com
+                path: /v1/oauth/token
+        phase: runtime
+        service: anthropic
+      description: Anthropic API access (API key or claude.ai OAuth)
+    - type: com.docker.sandbox/lifecycle@1
+      config:
+        install:
+            - command: |
+                set -e
+                mkdir -p /home/agent/.pi/agent /home/agent/.agents
+                chown agent:agent /home/agent/.pi /home/agent/.pi/agent /home/agent/.agents
+              description: Create and re-own ~/.pi and ~/.agents before the settings seed
+              user: "0"
+            - command: |
+                set -e
+                model='${{ kit.args.model }}'
+                thinking='${{ kit.args.thinkingLevel }}'
+                MODEL=''
+                THINKING=''
+                if [ -n "$model" ]; then
+                  provider=anthropic
+                  case "$model" in
+                    */*) provider=${model%%/*}; model=${model#*/} ;;
+                  esac
+                  MODEL="  \"defaultProvider\": \"$provider\",
+                  \"defaultModel\": \"$model\",
+                "
+                fi
+                [ -z "$thinking" ] || THINKING="  \"defaultThinkingLevel\": \"$thinking\",
+                "
+                mkdir -p /home/agent/.pi/agent
+                printf '%s' "{
+                  \"\$schema\": \"https://pi.dev/schemas/settings.schema.json\",
+                ${MODEL}${THINKING}  \"defaultProjectTrust\": \"always\"
+                }
+                " > /home/agent/.pi/agent/settings.json
+              description: Seed pi settings.json (project trust, model, thinking level)
+              user: agent
+            - command: if command -v npm > /dev/null 2>&1 && [ -n "${HTTP_PROXY:-}" ]; then npm config set proxy="$HTTP_PROXY" https-proxy="${HTTPS_PROXY:-$HTTP_PROXY}"; fi
+              description: Point npm at the sandbox proxy for pi's runtime package installs, when the base carries npm
+              env:
+                - HTTP_PROXY
+                - HTTPS_PROXY
+              user: agent
+            - command: |
+                set -e
+                [ -n "$MCP_GATEWAY_URL" ] || exit 0
+                pi mcp add mcp-gateway \
+                  --url "$MCP_GATEWAY_URL" \
+                  --header "Authorization=Bearer $MCP_SENTINEL_TOKEN_NAME"
+              description: Register the sandbox MCP gateway (install-time, race-free)
+              env:
+                - MCP_GATEWAY_URL
+                - MCP_SENTINEL_TOKEN_NAME
+              user: agent
+    - type: com.docker.sandbox/agent-skills@1
+      optional: true
+      config:
+        path: /home/agent/.agents/skills
+    - type: com.docker.sandbox/agent-context@2
+      optional: true
+      config:
+        content: |
+            ## Pi
+
+            pi is installed at `/usr/local/bin/pi` as a mixin: the CLI is here, but the sandbox's launch command belongs to
+            the base workload. Run `pi` for the interactive TUI, `pi -p "<prompt>"` for a one-shot run, `pi --continue` to
+            resume the most recent session for this directory, or `pi --resume` to open the session selector.
+
+            pi does not ask for approval before tool calls, so there is no permission mode to turn off. The one prompt it
+            would raise — project trust — is pre-answered in `~/.pi/agent/settings.json`
+            (`defaultProjectTrust: "always"`).
+
+            Authentication is proxy-mediated. `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` in this container are sentinels,
+            not keys; the sandbox proxy substitutes the host-bound credentials on requests to their respective APIs.
+            OpenAI access uses Docker-managed SIWC OAuth for Pi. If the host's Anthropic credential is a Claude
+            subscription (OAuth) login rather than an API key, it is materialized into `~/.pi/agent/auth.json`, pi's
+            native auth store, which pi prefers over the environment. Do not run `pi auth login` — it would try to
+            complete a browser flow against a host the sandbox does not allow, and write a real token over that file.
+            Never print or reconfigure either sentinel.
+
+            Skills are read from `~/.agents/skills`, where the host's shared skills store mounts. The `find` tool uses the
+            `fd` binary this overlay carries, and `grep` uses `rg` if the base has it.
+
+            `pi install npm:<pkg>` and `pi update` shell out to `npm`, which this overlay does not carry — it ships pi and
+            its Node runtime, not the installer. They work only on a base that provides `npm` itself. Where it is present,
+            both reach `registry.npmjs.org`, which this kit allows; a package that pulls from anywhere else will be refused
+            by the sandbox's network policy.
+        directory: /home/agent/.pi/agent
+        filename: AGENTS.md
+args:
+    model:
+        default: ""
+        description: pi model as provider/model or an Anthropic model ID; empty keeps the CLI default
+        pattern: ^[A-Za-z0-9._/:-]*$
+        env: PI_KIT_MODEL
+    thinkingLevel:
+        default: ""
+        description: Thinking level (settings.json `defaultThinkingLevel`); empty keeps pi's default of medium
+        enum:
+            - ""
+            - "off"
+            - minimal
+            - low
+            - medium
+            - high
+            - xhigh
+            - max
+        env: PI_KIT_THINKING_LEVEL
+    version:
+        required: true
+        description: pi release the overlay carries
+        pattern: ^[0-9]+\.[0-9]+\.[0-9]+$
+        buildArg: VERSION
