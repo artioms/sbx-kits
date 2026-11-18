@@ -1,11 +1,14 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=$BUILDPLATFORM alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f AS downloader
+FROM --platform=$TARGETPLATFORM debian:trixie-slim AS downloader
 
 ARG TARGETARCH
 ARG NODE_MAJOR=24
 
-RUN apk add --no-cache curl tar xz
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends curl tar xz-utils libatomic1; \
+    rm -rf /var/lib/apt/lists/*
 
 # Keep the supported LTS patch versions and their official SHA-256 values in sync.
 RUN set -eux; \
@@ -33,7 +36,7 @@ RUN set -eux; \
         esac ;; \
       *) echo "Unsupported Node.js LTS major: $NODE_MAJOR (supported: 22, 24, 26)"; exit 1 ;; \
     esac; \
-    mkdir -p /out/opt/node /out/usr/local/bin; \
+    mkdir -p /out/opt/node /out/usr/local/bin /out/usr/lib; \
     curl -fsSL \
       "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" \
       -o /tmp/node.tar.xz; \
@@ -42,8 +45,12 @@ RUN set -eux; \
       -C /out/opt/node --strip-components=1; \
     ln -s /opt/node/bin/node /out/usr/local/bin/node; \
     ln -s /opt/node/bin/npm /out/usr/local/bin/npm; \
-    ln -s /opt/node/bin/npx /out/usr/local/bin/npx
+    ln -s /opt/node/bin/npx /out/usr/local/bin/npx; \
+    atomic_lib="$(ldconfig -p | awk '$1 == "libatomic.so.1" { print $NF; exit }')"; \
+    test -n "$atomic_lib"; \
+    cp -L "$atomic_lib" /out/usr/lib/libatomic.so.1
 
+# Export only the required files
 FROM scratch
 
 COPY --from=downloader /out/ /
