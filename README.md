@@ -7,7 +7,8 @@ Reusable, composable Docker Sandbox kits. Each kit has one responsibility and ca
 | Kit | Responsibility |
 | --- | --- |
 | [`runtimes/node/`](./runtimes/node/) | Node.js 22, 24, or 26 LTS runtime, selected with a kit argument |
-| [`agents/pi-mixin/`](./agents/pi-mixin/) | Pi coding agent CLI and agent-specific configuration |
+| [`agents/pi/`](./agents/pi/) | Pi coding agent CLI and agent-specific configuration |
+| [`agents/opencode/`](./agents/opencode/) | OpenCode coding agent CLI and agent-specific configuration |
 
 The older [`pi/`](./pi/) workload is retained for now and is planned for removal. Prefer composing the Pi agent mixin with the runtime and tools you need.
 
@@ -32,13 +33,28 @@ The reusable Pi agent and Node runtime are separate mixins. This example compose
 ```bash
 sbx run shell \
   --name sbx-pi-node \
-  --kit ./agents/pi-mixin \
+  --kit ./agents/pi \
   --kit ./runtimes/node \
   --kit-arg node.version=26 \
   /Users/user/Dev/project
 ```
 
 Choose `node.version=22` or `node.version=24` for those LTS lines. Kit arguments are prefixed by kit name when needed to distinguish arguments declared by multiple kits. If the workload already provides Node.js, omit the Node runtime kit and its argument.
+
+### OpenCode agent with a Node.js runtime
+
+OpenCode is available as a separate agent mixin. Compose it with the Node runtime if the shell workload does not already provide Node.js:
+
+```bash
+sbx run shell \
+  --name sbx-opencode \
+  --kit ./agents/opencode \
+  --kit ./runtimes/node \
+  --kit-arg node.version=24 \
+  /Users/user/Dev/project
+```
+
+See the [OpenCode mixin documentation](./agents/opencode/README.md) for its model argument and usage.
 
 ### Node.js runtime only
 
@@ -59,7 +75,7 @@ Docker Sandbox can fetch kits from a Git repository. Replace `<OWNER>/<REPOSITOR
 ```bash
 sbx run shell \
   --name sbx-pi-node \
-  --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=agents/pi-mixin" \
+  --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=agents/pi" \
   --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=runtimes/node" \
   --kit-arg node.version=26 \
   /Users/user/Dev/project
@@ -70,7 +86,7 @@ For this repository, the same example using `main` is:
 ```bash
 sbx run shell \
   --name sbx-pi-node \
-  --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=agents/pi-mixin" \
+  --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=agents/pi" \
   --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=runtimes/node" \
   --kit-arg node.version=26 \
   .

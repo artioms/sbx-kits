@@ -1,0 +1,133 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+
+displayName: OpenCode Agent
+author: Artiom Sargesjan
+description: OpenCode coding agent CLI for Docker Sandbox shell workloads.
+
+sourceUrl: https://github.com/artioms/sbx-kits/agents/opencode
+version: "1.0.0"
+
+licenses:
+  - MIT
+
+provides:
+  - opencode@1.19.6
+
+args:
+  version:
+    default: "1.19.6"
+    description: OpenCode release to install
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+    buildArg: VERSION
+
+  model:
+    default: "openai/gpt-5.1"
+    description: Default model as provider/model
+    pattern: '^[A-Za-z0-9._/-]+$'
+    env: OPENCODE_KIT_MODEL
+
+capabilities:
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      runtime:
+        allow:
+          - api.anthropic.com:443
+          - api.openai.com:443
+          - registry.npmjs.org:443
+          - github.com:443
+          - api.github.com:443
+          - ssh.github.com:443
+
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: OpenAI credentials for OpenCode
+    config:
+      service: openai
+      phase: runtime
+      apiKey:
+        name: OPENAI_API_KEY
+        proxyManaged: true
+        inject:
+          - domain: api.openai.com
+            header: Authorization
+            format: "Bearer %s"
+
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: Anthropic credentials for OpenCode
+    config:
+      service: anthropic
+      phase: runtime
+      apiKey:
+        name: ANTHROPIC_API_KEY
+        proxyManaged: true
+        inject:
+          - domain: api.anthropic.com
+            header: x-api-key
+            format: "%s"
+
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - command: |
+            set -eu
+            mkdir -p /home/agent/.config/opencode
+            chown -R agent:agent /home/agent/.config
+          description: Prepare OpenCode configuration directory
+          user: "0"
+
+        - command: |
+            set -eu
+            model="${OPENCODE_KIT_MODEL:-openai/gpt-5.1}"
+            printf '{\n  "$schema": "https://opencode.ai/config.json",\n  "model": "%s"\n}\n' "$model" \
+              > /home/agent/.config/opencode/opencode.json
+          description: Configure the OpenCode default model
+          env:
+            - OPENCODE_KIT_MODEL
+          user: agent
+
+  - type: com.docker.sandbox/agent-skills@1
+    optional: true
+    config:
+      path: /home/agent/.agents/skills
+
+  - type: com.docker.sandbox/agent-context@2
+    optional: true
+    config:
+      directory: /home/agent/.config/opencode
+      filename: AGENTS.md
+      content: |
+        # OpenCode Agent
+
+        OpenCode is installed at /usr/local/bin/opencode.
+
+        ## Usage
+
+        Interactive:
+          opencode
+
+        One-shot:
+          opencode run "Your task"
+
+        ## Configuration
+
+        Configuration directory:
+          ~/.config/opencode
+
+        Shared skills:
+          ~/.agents/skills
+
+        ## Authentication
+
+        Authentication is managed by Docker Sandbox.
+        OPENAI_API_KEY and ANTHROPIC_API_KEY are
+        proxy-managed credentials, not real API keys.
+
+        Do not run `opencode auth login` or overwrite
+        Docker-managed authentication files.
+
+        ## Security
+
+        Do not print or expose credential sentinels.
