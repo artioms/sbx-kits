@@ -1,25 +1,23 @@
-# Custom Docker Sandbox Kits
+# SBX Kits
 
-A collection of custom Docker Sandbox workload configurations for running development tools in isolated environments.
+Reusable, composable Docker Sandbox kits. Each kit has one responsibility and can be combined with a shell workload or other kits.
 
-## Kits
+## Available kits
 
-| Kit | Description |
+| Kit | Responsibility |
 | --- | --- |
-| [Pi](./pi/) | Pi coding agent with Docker-managed OpenAI OAuth |
-| [Node 24](./node24/) | Node.js 24 development workload |
+| [`runtimes/node/`](./runtimes/node/) | Node.js 22, 24, or 26 LTS runtime, selected with a kit argument |
+| [`agents/pi-mixin/`](./agents/pi-mixin/) | Pi coding agent CLI and agent-specific configuration |
 
-## Structure
-
-- `pi/` — Pi coding agent sandbox configuration
-- `node24/` — Node.js 24 sandbox configuration
-- `shared/` — Reusable configuration and resources (planned)
+The older [`pi/`](./pi/) workload is retained for now and is planned for removal. Prefer composing the Pi agent mixin with the runtime and tools you need.
 
 ## Usage
 
-Run a sandbox with a project directory mounted into it. From a local clone of this repository:
+Run a sandbox with a project directory mounted into it. From a local clone of this repository, replace `/Users/user/Dev/project` with the absolute path to your project. Use `.` to mount the current directory. Choose a unique `--name` if you run multiple sandboxes.
 
-### Pi
+### Legacy Pi workload
+
+The existing `pi/` workload is kept temporarily while it is phased out:
 
 ```bash
 sbx run ./pi \
@@ -27,49 +25,61 @@ sbx run ./pi \
   /Users/user/Dev/project
 ```
 
-### Pi with the Node.js 24 mixin
+### Pi agent with a Node.js runtime
 
-`node24/` is a mixin, so add it to a workload such as Pi with `--kit`:
+The reusable Pi agent and Node runtime are separate mixins. This example composes them with the shell workload and selects Node.js 26:
 
 ```bash
-sbx run ./pi \
-  --name sbx-pi-node24 \
-  --kit ./node24 \
+sbx run shell \
+  --name sbx-pi-node \
+  --kit ./agents/pi-mixin \
+  --kit ./runtimes/node \
+  --kit-arg node.version=26 \
   /Users/user/Dev/project
 ```
 
-Replace `/Users/user/Dev/project` with the absolute path to your project. Choose a unique value for `--name` if you run multiple sandboxes. To run Pi without the Node.js mixin, omit `--kit ./node24`. You can also use `.` as the project path to mount your current directory:
+Choose `node.version=22` or `node.version=24` for those LTS lines. Kit arguments are prefixed by kit name when needed to distinguish arguments declared by multiple kits. If the workload already provides Node.js, omit the Node runtime kit and its argument.
+
+### Node.js runtime only
 
 ```bash
-sbx run ./pi --name sbx-pi .
-```
-
-### Run directly from GitHub
-
-Docker Sandbox can fetch kits from a Git repository. In this template, replace `<OWNER>/<REPOSITORY>` with the repository location and `<COMMIT>` with a commit SHA (recommended) or tag. `dir` selects a kit directory within the repository:
-
-```bash
-sbx run \
-  "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=pi" \
-  --name sbx-pi-node24 \
-  --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=node24" \
-  /Users/user/Dev/project
-```
-
-For this repository, here is a ready-to-run example that uses the latest commit on `main` and mounts your current directory:
-
-```bash
-sbx run \
-  "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=pi" \
-  --name sbx-pi-node24 \
-  --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=node24" \
+sbx run shell \
+  --name sbx-node \
+  --kit ./runtimes/node \
+  --kit-arg version=24 \
   .
 ```
 
-`dir` selects each kit directory. The example uses `main`; for reproducible builds, replace `main` in both URLs with the same commit SHA. Git-based kit sources may be restricted by Docker Sandbox configuration; allow Git sources if your installation blocks them by default. See Docker's [kit source documentation](https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-a-kit-source).
+Verify the selected runtime in the sandbox with `node --version`, `npm --version`, and `npx --version`. See the [Node runtime documentation](./runtimes/node/README.md) for pinned patch releases, architecture support, platform requirements, and the update process.
+
+### Run kits directly from GitHub
+
+Docker Sandbox can fetch kits from a Git repository. Replace `<OWNER>/<REPOSITORY>` and `<COMMIT>` with the repository and an immutable commit SHA. The `dir` parameter selects a kit directory:
+
+```bash
+sbx run shell \
+  --name sbx-pi-node \
+  --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=agents/pi-mixin" \
+  --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=runtimes/node" \
+  --kit-arg node.version=26 \
+  /Users/user/Dev/project
+```
+
+For this repository, the same example using `main` is:
+
+```bash
+sbx run shell \
+  --name sbx-pi-node \
+  --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=agents/pi-mixin" \
+  --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=runtimes/node" \
+  --kit-arg node.version=26 \
+  .
+```
+
+The `main` example follows repository updates and is not immutable. For reproducible builds, use the same commit SHA in both kit URLs. Git-based kit sources may be restricted by Docker Sandbox configuration; allow Git sources if your installation blocks them by default. See Docker's [kit source documentation](https://docs.docker.com/ai/sandboxes/customize/use-kits/#choose-a-kit-source).
 
 ## Security
 
-- Credentials are managed by Docker Sandbox.
-- No API keys or OAuth tokens are stored in this repository.
-- Network access is explicitly configured per workload.
+- Credentials are managed by Docker Sandbox; never store real API keys in kit files or images.
+- Network access is declared by the relevant workload or kit.
+- Prefer immutable Git commit references for reproducible composition.

@@ -1,0 +1,20 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+
+displayName: Node.js LTS Runtime
+description: Node.js 22, 24, or 26 LTS runtime with npm and npx
+version: "1.0.0"
+
+provides:
+  - node
+
+args:
+  version:
+    default: "24"
+    description: Node.js LTS major version to install
+    enum:
+      - "22"
+      - "24"
+      - "26"
+    buildArg: NODE_MAJOR

@@ -11,11 +11,6 @@ RUN npm install -g \
     --ignore-scripts \
     "@earendil-works/pi-coding-agent@${VERSION}"
 
-# Export the Node.js runtime too
-RUN set -eux; \
-    node_bin="$(readlink -f "$(command -v node)")"; \
-    install -D "$node_bin" /out/usr/local/bin/node
-
 # Final mixin filesystem
 FROM scratch
 
