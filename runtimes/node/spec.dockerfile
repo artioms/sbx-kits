@@ -7,7 +7,12 @@ ARG NODE_MAJOR=24
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends curl tar xz-utils libatomic1; \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      tar \
+      xz-utils \
+      libatomic1; \
     rm -rf /var/lib/apt/lists/*
 
 # Keep the supported LTS patch versions and their official SHA-256 values in sync.
