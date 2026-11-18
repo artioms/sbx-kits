@@ -58,5 +58,5 @@ RUN set -eux; \
 
 # Export only the required files
 FROM scratch
-ENV GIT_PAGER=cat
+
 COPY --from=downloader /out/ /

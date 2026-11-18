@@ -1,0 +1,13 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+
+displayName: Terminal Utilities
+description: Common terminal utilities for developer workflows
+version: "1.0.0"
+
+provides:
+  - less
+  - jq
+  - ripgrep
+  - fd

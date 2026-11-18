@@ -7,6 +7,7 @@ Reusable, composable Docker Sandbox kits. Each kit has one responsibility and ca
 | Kit | Responsibility |
 | --- | --- |
 | [`runtimes/node/`](./runtimes/node/) | Node.js 22, 24, or 26 LTS runtime, selected with a kit argument |
+| [`tools/terminal/`](./tools/terminal/) | Common terminal utilities: less, jq, ripgrep, and fd |
 | [`agents/pi/`](./agents/pi/) | Pi coding agent CLI and agent-specific configuration |
 | [`agents/opencode/`](./agents/opencode/) | OpenCode coding agent CLI and agent-specific configuration |
 
@@ -77,6 +78,7 @@ sbx run shell \
   --name sbx-pi-node \
   --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=agents/pi" \
   --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=runtimes/node" \
+  --kit "git+https://github.com/<OWNER>/<REPOSITORY>.git#ref=<COMMIT>&dir=tools/terminal" \
   --kit-arg node.version=26 \
   /Users/user/Dev/project
 ```
@@ -88,6 +90,7 @@ sbx run shell \
   --name sbx-pi-node \
   --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=agents/pi" \
   --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=runtimes/node" \
+  --kit "git+https://github.com/artioms/sbx-kits.git#ref=main&dir=tools/terminal" \
   --kit-arg node.version=26 \
   .
 ```
