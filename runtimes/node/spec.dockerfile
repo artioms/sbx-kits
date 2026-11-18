@@ -12,7 +12,8 @@ RUN set -eux; \
       curl \
       tar \
       xz-utils \
-      libatomic1; \
+      libatomic1 \
+      less; \
     rm -rf /var/lib/apt/lists/*
 
 # Keep the supported LTS patch versions and their official SHA-256 values in sync.
@@ -53,7 +54,15 @@ RUN set -eux; \
     ln -s /opt/node/bin/npx /out/usr/local/bin/npx; \
     atomic_lib="$(ldconfig -p | awk '$1 == "libatomic.so.1" { print $NF; exit }')"; \
     test -n "$atomic_lib"; \
-    cp -L "$atomic_lib" /out/usr/lib/libatomic.so.1
+    cp -L "$atomic_lib" /out/usr/lib/libatomic.so.1; \
+    mkdir -p /out/usr/bin; \
+    LESS_BIN="$(command -v less)"; \
+    cp -L "$LESS_BIN" /out/usr/bin/less; \
+    ldd "$LESS_BIN" | awk '/=> \// { print $3 } /^\// { print $1 }' | \
+    while read -r lib; do \
+        mkdir -p "/out$(dirname "$lib")"; \
+        cp -L "$lib" "/out$lib"; \
+    done
 
 # Export only the required files
 FROM scratch
